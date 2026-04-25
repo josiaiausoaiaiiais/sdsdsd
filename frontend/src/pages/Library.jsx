@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Search, Upload, Folder, Grid2x2, List, Plus, MoreHorizontal, Play, Trash2 } from "lucide-react";
-import DashboardLayout, { PageHeader } from "../components/DashboardLayout";
+import { Search, Upload, Folder, Grid2x2, List, Plus, MoreHorizontal, Play, Trash2 } from "lucide-react";import DashboardLayout, { PageHeader } from "../components/DashboardLayout";
 import { VideoCard, FilterPill, EmptyState } from "../components/brewly/MediaPrimitives";
 import { useUploads, useFavorites, relTime, fmtDuration } from "../lib/data";
 
@@ -16,9 +15,11 @@ export default function LibraryPage() {
   const [folder, setFolder] = useState("all");
   const [q, setQ] = useState("");
   const [view, setView] = useState("grid");
-  const { items, add, remove } = useUploads();
+  const { items, add, addFile, remove } = useUploads();
   const { items: favs, toggle } = useFavorites();
   const favSet = useMemo(() => new Set((favs || []).map(f => f.id)), [favs]);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = React.useRef(null);
 
   const filtered = useMemo(() => {
     if (!items) return [];
@@ -46,6 +47,20 @@ export default function LibraryPage() {
     });
   };
 
+  const handleFileChange = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setUploading(true);
+    try {
+      await addFile(f, f.name.replace(/\.[^/.]+$/, ""), "16:9");
+    } catch (err) {
+      alert("Upload failed: " + (err.response?.data?.detail || err.message));
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
   const toCardItem = (v) => ({
     title: v.title, ratio: v.ratio, time: relTime(v.created_at),
     views: `${v.views}`, duration: fmtDuration(v.duration_sec),
@@ -62,8 +77,11 @@ export default function LibraryPage() {
         subtitle="Search, organize, and brew your archive into something fans can binge."
         action={
           <div className="flex gap-2">
+            <input ref={fileRef} type="file" accept="video/*" className="hidden" onChange={handleFileChange} data-testid="library-file-input" />
             <button className="doodle-btn bg-surface h-11 px-4 text-sm" data-testid="library-new-folder"><Plus className="h-4 w-4" /> New folder</button>
-            <button onClick={handleQuickAdd} className="doodle-btn btn-primary h-11 px-5 text-sm" data-testid="library-upload"><Upload className="h-4 w-4" /> Upload</button>
+            <button onClick={() => fileRef.current?.click()} disabled={uploading} className="doodle-btn btn-primary h-11 px-5 text-sm disabled:opacity-60" data-testid="library-upload">
+              <Upload className="h-4 w-4" /> {uploading ? "Uploading…" : "Upload"}
+            </button>
           </div>
         }
       />

@@ -80,6 +80,11 @@ export function LoginPage() {
         <button disabled={busy} type="submit" className="doodle-btn btn-primary w-full h-12 text-base disabled:opacity-60" data-testid="login-submit">
           {busy ? "Brewing…" : "Log in"} <ArrowRight className="h-4 w-4" />
         </button>
+        <div className="text-center pt-2">
+          <Link to="/forgot-password" className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground hover:text-foreground" data-testid="forgot-link">
+            Forgot password?
+          </Link>
+        </div>
       </form>
     </AuthShell>
   );

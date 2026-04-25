@@ -10,6 +10,8 @@ import Analytics from "@/pages/Analytics";
 import Remix from "@/pages/Remix";
 import Studio from "@/pages/Studio";
 import { LoginPage, SignupPage } from "@/pages/Auth";
+import { ForgotPasswordPage, ResetPasswordPage } from "@/pages/Password";
+import ChannelEmbed from "@/pages/ChannelEmbed";
 import { AuthProvider, useAuth } from "@/lib/auth";
 
 function Protected({ children }) {
@@ -28,6 +30,9 @@ function App() {
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/c/:slug" element={<ChannelEmbed />} />
             <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
             <Route path="/dashboard/library" element={<Protected><Library /></Protected>} />
             <Route path="/dashboard/favorites" element={<Protected><Favorites /></Protected>} />

@@ -21,11 +21,35 @@ export function useUploads() {
     setItems(prev => [data, ...(prev || [])]);
     return data;
   };
+  const addFile = async (file, title, ratio = "16:9") => {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("title", title || file.name);
+    fd.append("ratio", ratio);
+    const { data } = await axios.post(`${API}/uploads/file`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+    setItems(prev => [data, ...(prev || [])]);
+    return data;
+  };
   const remove = async (id) => {
     await axios.delete(`${API}/uploads/${id}`);
     setItems(prev => (prev || []).filter(x => x.id !== id));
   };
-  return { items, add, remove, refresh };
+  return { items, add, addFile, remove, refresh };
+}
+
+export async function savePreset(uploadId, preset) {
+  return (await axios.put(`${API}/uploads/${uploadId}/preset`, preset)).data;
+}
+
+export async function generateRemix(prompt, style, ratio) {
+  return (await axios.post(`${API}/remix/generate`, { prompt, style, ratio })).data;
+}
+
+export function resolveVideoUrl(u) {
+  if (!u) return null;
+  if (u.startsWith("http")) return u;
+  if (u.startsWith("/api")) return `${process.env.REACT_APP_BACKEND_URL}${u}`;
+  return u;
 }
 
 export function useFavorites() {

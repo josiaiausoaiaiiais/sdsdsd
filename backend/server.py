@@ -8,11 +8,14 @@ import secrets
 import random
 from datetime import datetime, timezone, timedelta
 from typing import Optional
-from fastapi import FastAPI, HTTPException, Request, Response, Depends, APIRouter
+from fastapi import FastAPI, HTTPException, Request, Response, Depends, APIRouter, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
+import uuid, pathlib, re
+import fal_client
 
 # ---------------- DB ----------------
 client = AsyncIOMotorClient(os.environ["MONGO_URL"])
@@ -83,6 +86,33 @@ class UploadIn(BaseModel):
 
 class FavoriteIn(BaseModel):
     upload_id: str
+
+class PresetIn(BaseModel):
+    accent_id: Optional[str] = None
+    accent_hsl: Optional[str] = None
+    accent_on: Optional[str] = None
+    theme_id: Optional[str] = None
+    icon_style: Optional[str] = None
+    lower_third: Optional[str] = None
+
+class ChannelIn(BaseModel):
+    name: str = Field(min_length=2, max_length=60)
+    tagline: Optional[str] = ""
+    slug: Optional[str] = None
+    color: Optional[str] = "linear-gradient(135deg, hsl(8 85% 67%), hsl(45 95% 65%))"
+    upload_ids: list[str] = []
+
+class ForgotIn(BaseModel):
+    email: EmailStr
+
+class ResetIn(BaseModel):
+    token: str
+    password: str = Field(min_length=6)
+
+class RemixIn(BaseModel):
+    prompt: str = Field(min_length=3, max_length=500)
+    style: Optional[str] = "Cozy Tutorial"
+    ratio: Optional[str] = "9:16"
 
 # ---------------- Seeding ----------------
 SAMPLE_TITLES = [
@@ -246,6 +276,8 @@ def upload_to_dict(u: dict) -> dict:
         "duration_sec": u.get("duration_sec", 0),
         "views": u.get("views", 0),
         "thumbnail": u.get("thumbnail", GRADIENTS[0]),
+        "video_url": u.get("video_url"),
+        "preset": u.get("preset"),
         "created_at": u["created_at"].isoformat() if isinstance(u.get("created_at"), datetime) else str(u.get("created_at", "")),
     }
 
@@ -302,8 +334,182 @@ async def remove_favorite(upload_id: str, user: dict = Depends(get_current_user)
     await db.favorites.delete_one({"user_id": user["id"], "upload_id": upload_id})
     return {"ok": True}
 
+# ---------- File upload (local storage) ----------
+UPLOAD_DIR = pathlib.Path("/app/backend/uploads_data")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+@api.post("/uploads/file")
+async def upload_file(
+    file: UploadFile = File(...),
+    title: str = Form("Untitled video"),
+    ratio: str = Form("16:9"),
+    user: dict = Depends(get_current_user),
+):
+    if not (file.content_type or "").startswith("video/"):
+        raise HTTPException(400, "Only video files are accepted")
+    ext = pathlib.Path(file.filename or "").suffix.lower() or ".mp4"
+    if ext not in [".mp4", ".mov", ".webm", ".m4v"]:
+        ext = ".mp4"
+    name = f"{user['id']}_{uuid.uuid4().hex}{ext}"
+    path = UPLOAD_DIR / name
+    size = 0
+    with open(path, "wb") as f:
+        while chunk := await file.read(1024 * 1024):
+            size += len(chunk)
+            if size > 200 * 1024 * 1024:
+                f.close(); path.unlink(missing_ok=True)
+                raise HTTPException(413, "Max 200MB")
+            f.write(chunk)
+    video_url = f"/api/uploads/files/{name}"
+    doc = {
+        "user_id": user["id"], "title": title, "source": "upload",
+        "ratio": ratio, "duration_sec": 0, "views": 0,
+        "thumbnail": "linear-gradient(135deg, hsl(170 40% 35%), hsl(45 95% 65%))",
+        "video_url": video_url, "size_bytes": size,
+        "created_at": datetime.now(timezone.utc),
+    }
+    res = await db.uploads.insert_one(doc)
+    doc["_id"] = res.inserted_id
+    return upload_to_dict(doc)
+
+# ---------- Studio preset per upload ----------
+@api.put("/uploads/{upload_id}/preset")
+async def save_preset(upload_id: str, body: PresetIn, user: dict = Depends(get_current_user)):
+    if not ObjectId.is_valid(upload_id):
+        raise HTTPException(400, "Invalid id")
+    res = await db.uploads.update_one(
+        {"_id": ObjectId(upload_id), "user_id": user["id"]},
+        {"$set": {"preset": body.model_dump(exclude_none=True), "preset_updated_at": datetime.now(timezone.utc)}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(404, "Not found")
+    return {"ok": True, "preset": body.model_dump(exclude_none=True)}
+
+@api.get("/uploads/{upload_id}/preset")
+async def get_preset(upload_id: str, user: dict = Depends(get_current_user)):
+    if not ObjectId.is_valid(upload_id):
+        raise HTTPException(400, "Invalid id")
+    u = await db.uploads.find_one({"_id": ObjectId(upload_id), "user_id": user["id"]})
+    if not u:
+        raise HTTPException(404, "Not found")
+    return u.get("preset") or {}
+
+# ---------- Channels ----------
+def slugify(s: str) -> str:
+    s = re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
+    return s[:40] or uuid.uuid4().hex[:8]
+
+def channel_to_dict(c: dict) -> dict:
+    return {
+        "id": str(c["_id"]),
+        "slug": c["slug"],
+        "name": c["name"],
+        "tagline": c.get("tagline", ""),
+        "color": c.get("color", ""),
+        "upload_ids": c.get("upload_ids", []),
+        "owner_name": c.get("owner_name", ""),
+        "created_at": c["created_at"].isoformat() if isinstance(c.get("created_at"), datetime) else "",
+    }
+
+@api.get("/channels")
+async def list_channels(user: dict = Depends(get_current_user)):
+    docs = await db.channels.find({"user_id": user["id"]}).sort("created_at", -1).to_list(100)
+    return [channel_to_dict(d) for d in docs]
+
+@api.post("/channels")
+async def create_channel(body: ChannelIn, user: dict = Depends(get_current_user)):
+    slug = body.slug or slugify(body.name)
+    if await db.channels.find_one({"slug": slug}):
+        slug = f"{slug}-{uuid.uuid4().hex[:5]}"
+    doc = {
+        "user_id": user["id"], "owner_name": user.get("name", ""),
+        "slug": slug, "name": body.name, "tagline": body.tagline or "",
+        "color": body.color, "upload_ids": body.upload_ids,
+        "created_at": datetime.now(timezone.utc),
+    }
+    res = await db.channels.insert_one(doc)
+    doc["_id"] = res.inserted_id
+    return channel_to_dict(doc)
+
+@api.get("/channels/public/{slug}")
+async def get_public_channel(slug: str):
+    c = await db.channels.find_one({"slug": slug})
+    if not c:
+        raise HTTPException(404, "Channel not found")
+    ids = [ObjectId(x) for x in c.get("upload_ids", []) if ObjectId.is_valid(x)]
+    uploads = await db.uploads.find({"_id": {"$in": ids}}).to_list(200) if ids else []
+    return {**channel_to_dict(c), "uploads": [upload_to_dict(u) for u in uploads]}
+
+# ---------- Forgot / Reset password (console-log link only) ----------
+@api.post("/auth/forgot-password")
+async def forgot_password(body: ForgotIn):
+    email = body.email.lower()
+    user = await db.users.find_one({"email": email})
+    if user:
+        token = secrets.token_urlsafe(32)
+        await db.password_reset_tokens.insert_one({
+            "user_id": str(user["_id"]),
+            "token": token,
+            "used": False,
+            "expires_at": datetime.now(timezone.utc) + timedelta(hours=1),
+            "created_at": datetime.now(timezone.utc),
+        })
+        link = f"{os.environ.get('FRONTEND_URL','')}/reset-password?token={token}"
+        print(f"\n[BREWLY] Password reset link for {email}:\n  {link}\n", flush=True)
+    return {"ok": True}
+
+@api.post("/auth/reset-password")
+async def reset_password(body: ResetIn):
+    rec = await db.password_reset_tokens.find_one({"token": body.token})
+    if not rec or rec.get("used"):
+        raise HTTPException(400, "Invalid or expired token")
+    exp = rec["expires_at"]
+    if exp.tzinfo is None: exp = exp.replace(tzinfo=timezone.utc)
+    if exp < datetime.now(timezone.utc):
+        raise HTTPException(400, "Token expired")
+    await db.users.update_one({"_id": ObjectId(rec["user_id"])},
+                              {"$set": {"password_hash": hash_password(body.password)}})
+    await db.password_reset_tokens.update_one({"_id": rec["_id"]}, {"$set": {"used": True}})
+    return {"ok": True}
+
+# ---------- Remix (fal.ai) ----------
+@api.post("/remix/generate")
+async def remix_generate(body: RemixIn, user: dict = Depends(get_current_user)):
+    """Use fal.ai text-to-video to generate a short clip from a prompt + style."""
+    full_prompt = f"{body.prompt}. Style: {body.style}. Vertical short-form, cozy editorial mood."
+    try:
+        handler = await fal_client.submit_async(
+            "fal-ai/minimax/video-01",
+            arguments={"prompt": full_prompt[:500], "prompt_optimizer": True},
+        )
+        result = await handler.get()
+        video_url = (result.get("video") or {}).get("url") if isinstance(result, dict) else None
+        if not video_url:
+            raise HTTPException(502, "Generation succeeded but no video URL returned")
+        # Save as upload
+        doc = {
+            "user_id": user["id"],
+            "title": body.prompt[:80],
+            "source": "ai",
+            "ratio": body.ratio,
+            "duration_sec": 6,
+            "views": 0,
+            "thumbnail": "linear-gradient(135deg, hsl(8 85% 67%), hsl(45 95% 65%))",
+            "video_url": video_url,
+            "remix_meta": {"style": body.style, "model": "fal-ai/minimax/video-01"},
+            "created_at": datetime.now(timezone.utc),
+        }
+        res = await db.uploads.insert_one(doc)
+        doc["_id"] = res.inserted_id
+        return upload_to_dict(doc)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(502, f"fal.ai error: {e}")
+
 # ---------------- Mount ----------------
 app.include_router(api)
+app.mount("/api/uploads/files", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,

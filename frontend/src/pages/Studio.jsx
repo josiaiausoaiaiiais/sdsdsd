@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import DashboardLayout, { PageHeader } from "../components/DashboardLayout";
 import { FilterPill } from "../components/brewly/MediaPrimitives";
-import { useUploads, fmtDuration } from "../lib/data";
+import { useUploads, fmtDuration, savePreset, resolveVideoUrl } from "../lib/data";
 
 /* Demo coral→mustard placeholder if user hasn't picked anything yet.
    Plays as a poster + animated SVG since we don't have real media. */
@@ -235,7 +235,37 @@ export default function StudioPage() {
     (uploads || []).find(u => u.id === selectedId) || null,
   [uploads, selectedId]);
 
-  const playerSrc = customSrc || DEMO_VIDEO;
+  // Load preset when a library video is picked
+  useEffect(() => {
+    if (!selected?.preset) return;
+    const p = selected.preset;
+    if (p.accent_id) {
+      const found = ACCENT_PRESETS.find(x => x.id === p.accent_id);
+      if (found) setAccent(found);
+      else if (p.accent_hsl) setAccent({ id: "custom", name: "Custom", hsl: p.accent_hsl, onColor: p.accent_on || "40 50% 98%" });
+    }
+    if (p.theme_id) {
+      const t = THEMES.find(x => x.id === p.theme_id); if (t) setTheme(t);
+    }
+    if (p.icon_style) {
+      const ic = ICON_STYLES.find(x => x.id === p.icon_style); if (ic) setIconStyle(ic);
+    }
+    if (typeof p.lower_third === "string") setLowerThird(p.lower_third);
+  }, [selected?.id]);
+
+  // Auto-save preset when selected video has changes (debounced)
+  useEffect(() => {
+    if (!selected?.id) return;
+    const t = setTimeout(() => {
+      savePreset(selected.id, {
+        accent_id: accent.id, accent_hsl: accent.hsl, accent_on: accent.onColor,
+        theme_id: theme.id, icon_style: iconStyle.id, lower_third: lowerThird,
+      }).catch(() => {});
+    }, 700);
+    return () => clearTimeout(t);
+  }, [selected?.id, accent, theme, iconStyle, lowerThird]);
+
+  const playerSrc = customSrc || resolveVideoUrl(selected?.video_url) || DEMO_VIDEO;
   const posterBg = selected?.thumbnail || DEMO_POSTER;
 
   const handleFile = (e) => {
