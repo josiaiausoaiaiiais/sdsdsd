@@ -1,0 +1,44 @@
+{
+  "summary": "Iteration 7 verified the 3 newly added audit-gap features: (1) music tracks listing + ffmpeg-based music mixing endpoint, (2) ffmpeg-based real trim endpoint, (3) functional Studio remix Export buttons. 13/13 new backend tests passed; 92/93 across full regression (1 pre-existing flaky storage 500 unrelated). Frontend flows for Edit (music picker + transcript cut -> /trim banner) and Studio remix (clip export -> file download) all working.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/videos & POST /api/videos/{id}/music|trim", "issue": "video_to_out() omits derived_from from API responses; useful lineage hidden from clients. DB doc has it. Consider exposing it for the UI to show 'derived from <title>'."},
+      {"endpoint": "POST /api/videos/{id}/clips/render", "issue": "Intermittent 500 on storage path (1 flaky failure during regression, ~3% rate). Independent of this session's changes; retry on same uploaded video succeeded."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Edit page - Tools sidebar", "issues": ["Add background music button color is fine, but no visual indication of currently-selected track once picker is reopened - selection state resets to default 'upbeat' on toggle; consider persisting selectedTrack across toggles."]},
+      {"screen": "Edit page - Transcript editor", "issues": ["Save button is hidden until deleted.size > 0; this is intentional but new users have no visible affordance. Consider always rendering button (disabled) or adding hint text."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter7_audit_gaps.py",
+    "/app/test_reports/pytest/pytest_iter7.xml",
+    "/app/test_reports/pytest/pytest_iter7_full.xml"
+  ],
+  "action_items": [
+    "OPTIONAL (low priority): expose derived_from in video_to_out so the UI can link back to source video.",
+    "OPTIONAL: harden /api/videos/{id}/clips/render against intermittent storage-path 500 (only 1/93 retries failed); investigate _new_derived_video file write race if it recurs.",
+    "OPTIONAL: persist selected music track when re-opening the picker (state currently defaults back to 'upbeat')."
+  ],
+  "critical_code_review_comments": [
+    "backend/server.py is 1440 lines - exceeds 700 line guideline. Splitting helpers (_mix_music_bytes, _trim_bytes, _new_derived_video, MUSIC_TRACKS) into a dedicated media module would improve maintainability.",
+    "Music sine generation is hardcoded - works as a 'royalty-free pad' placeholder but is technically not music; product copy says 'background music' which may set wrong expectations. Consider clarifying in UI ('synth pad') or shipping actual audio files later.",
+    "/trim and /music endpoints write a new file synchronously inside the request (ffmpeg can take 5-60s); consider moving to BackgroundTasks + polling or returning 202 for very long sources. Acceptable for current 8s test video sizes.",
+    "Frontend Edit.jsx hasTranscript depends on transcript.status === 'ready'; works because GET /transcript fills status from videos.transcript_status. Safe but coupling is implicit - good to add a JSDoc comment."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter7_audit_gaps.py (new test file)"
+  ],
+  "success_rate": {"backend": "100% (13/13 new, 92/93 full regression)", "frontend": "100% (3/3 audit-gap flows)"},
+  "test_credentials": "qa.looma@test.com / QaLooma#2026 (JWT auth, ROUTED via /api/auth/login)",
+  "seed_data_creation": "Inserted a 5-segment fake transcript doc for video e246c981-27fc-463f-a6ae-3de54b38c6a9 ('QA Test Video') and set transcript_status='ready' so frontend cut/trim UI could be exercised without invoking Whisper. Mongo collection: transcripts.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All 3 audit-gap features (music tracks list, music mix endpoint, trim endpoint, Studio remix Export) are confirmed working both at API and UI level. Key uploaded test video id with seeded transcript: e246c981-27fc-463f-a6ae-3de54b38c6a9. New tests in /app/backend/tests/test_iter7_audit_gaps.py - run with `REACT_APP_BACKEND_URL=$(grep REACT_APP_BACKEND_URL /app/frontend/.env | cut -d= -f2) pytest backend/tests/test_iter7_audit_gaps.py`. Music apply on UI takes ~5s (ffmpeg); trim takes ~5s; clip render export ~5-20s. Studio Export download triggers a browser download with filename clip-{ratio}.mp4.",
+  "rca of the issue": "N/A - no blocking bugs found. Minor RCA on initial UI test miss: edit-save button is conditional on deleted.size > 0; my first script queried it before clicking segments and reported false-negative. Fixed by querying after segment clicks."
+}
