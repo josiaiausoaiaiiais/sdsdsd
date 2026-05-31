@@ -116,6 +116,8 @@ class Video(BaseModel):
     allowed_domains: List[str] = []
     private_enabled: bool = False
     private_token: Optional[str] = None
+    content_type_label: Optional[str] = None
+    derived_from: Optional[str] = None
     created_at: str
 
 class VideoUpdate(BaseModel):
@@ -554,6 +556,8 @@ def video_to_out(v: dict) -> dict:
         "allowed_domains": v.get("allowed_domains", []),
         "private_enabled": v.get("private_enabled", False),
         "private_token": v.get("private_token"),
+        "content_type_label": v.get("content_type_label"),
+        "derived_from": v.get("derived_from"),
         "created_at": v.get("created_at", ""),
     }
 
