@@ -23,6 +23,12 @@ User asked to start the task using both uploaded artifacts: the Looma source zip
 - Studio remix export: Studio.jsx remix tab now loads `/videos/{id}/clips`, renders per-clip aspect-ratio Export buttons wired to `POST /videos/{id}/clips/render`, and downloads the rendered file. The dead "Export clip" button is removed.
 - Verified end-to-end via external URL: trim of [1-3]+[5-7] → 4.0s video; music + clip render return new assets. FFmpeg helpers tested for both audio and no-audio sources.
 
+## Update (Feb 2026) — UI/UX + verification pass
+- Sidebar (DashboardLayout.jsx): compacted spacing (py-2, text-sm, gap-0.5) so all 8 menu items (Home..Brand) are fully visible without scrolling — verified at 1366x768 (Brand bottom y≈451 / 768).
+- Video player fullscreen fix: useVideoPlayer now exposes containerRef and requestFullscreen targets the .player-shell container (NOT the bare <video>), so the custom branded controls/heatmap/CTA stay visible in fullscreen. Added .player-shell:fullscreen CSS (fills screen) and .player-ctrl branded control buttons (brand-color hover, nb-border, font-heading timecode). Applied to both VideoPlayer.jsx and PublicViewer.jsx.
+- Create = single feature: RecordModal already combines upload + record in one modal; heading updated to "Upload or record a video".
+- Verified (iteration_8, frontend-only): sidebar fit, fullscreen target, single Create modal, and all 4 Studio tabs (Transcript/Remix/Brand/Convert) functional with no UI bugs/crashes. Lint clean across all changed files.
+
 ## Known Notes
 - Browser playback can show CORS console errors if a seeded video URL uses a third-party host like `example.com`; internal uploaded/storage-backed videos avoid this.
 - Transcription errors in logs during tests are expected for fake random webm test files; real supported media files go through Whisper.
