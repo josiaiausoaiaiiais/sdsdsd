@@ -7,7 +7,7 @@ import { useVideoPlayer, fmtTime } from "@/hooks/useVideoPlayer";
  */
 export default function VideoPlayer({ src, videoId, brandColor = "#FF6B6B", logoText = "Looma", logoPosition = "top-right", thumbnail = "", ctas = [] }) {
   const {
-    ref, containerRef, playing, progress, duration, muted, heatmap,
+    ref, containerRef, playing, progress, duration, muted, ended, heatmap,
     onLoadedMetadata, onTimeUpdate, toggle, seek, reset, toggleMute, requestFullscreen,
   } = useVideoPlayer({ videoId });
 
@@ -16,6 +16,8 @@ export default function VideoPlayer({ src, videoId, brandColor = "#FF6B6B", logo
     heatmap.find(h => h.index === i)?.intensity ?? 0.08
   );
   const activeCta = ctas.find(c => duration && ((progress / 100) * duration) >= Number(c.timestamp || 0));
+  const sortedCtas = ctas.slice().sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0));
+  const endCta = sortedCtas.find(c => c.type === "form") || sortedCtas[0] || null;
   const pos = { "top-left": "top-4 left-4", "top-right": "top-4 right-4", "bottom-left": "bottom-4 left-4", "bottom-right": "bottom-4 right-4" }[logoPosition] || "top-4 right-4";
 
   return (
@@ -44,12 +46,36 @@ export default function VideoPlayer({ src, videoId, brandColor = "#FF6B6B", logo
         </div>
       )}
 
-      {!playing && (
+      {!playing && !ended && (
         <button onClick={toggle} aria-label="Play" data-testid="player-play-overlay"
           className="absolute inset-0 m-auto w-20 h-20 rounded-full nb-border text-white flex items-center justify-center shadow-[6px_6px_0_0_rgba(0,0,0,0.6)] transition-transform hover:scale-110"
           style={{ background: brandColor }}>
           <Play size={32} fill="white" />
         </button>
+      )}
+
+      {ended && (
+        <div className="absolute inset-0 bg-ink/90 backdrop-blur-sm flex flex-col items-center justify-center text-center p-6" data-testid="player-end-screen">
+          <div className="flex items-center gap-2 mb-4 bg-white/95 nb-border rounded-full px-4 py-2 font-heading font-black">
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: brandColor }}/> {logoText}
+          </div>
+          {endCta ? (
+            <div className="bg-white nb-border nb-shadow-lg rounded-2xl p-5 max-w-md w-full" data-testid="player-end-cta">
+              <div className="font-heading text-xl mb-3 text-ink">{endCta.text || "Want to learn more?"}</div>
+              {endCta.type === "form" ? (
+                <form className="space-y-2" onSubmit={(e) => e.preventDefault()}>
+                  {(endCta.form_fields || ["email"]).map(f => <input key={f} className="nb-input text-sm" placeholder={f} data-testid={`player-end-field-${f}`}/>) }
+                  <button className="nb-btn w-full text-sm" style={{ background: brandColor }} data-testid="player-end-submit">Submit</button>
+                </form>
+              ) : (
+                <a href={endCta.url || "#"} target="_blank" rel="noreferrer" className="nb-btn w-full justify-center text-sm" style={{ background: brandColor }} data-testid="player-end-link">{endCta.button_label || "Learn more"}</a>
+              )}
+            </div>
+          ) : (
+            <div className="text-white font-heading text-xl mb-4">Thanks for watching!</div>
+          )}
+          <button onClick={reset} className="mt-5 nb-btn nb-btn-ghost bg-white text-sm" data-testid="player-end-replay"><RotateCcw size={16}/> Watch again</button>
+        </div>
       )}
 
       <div className={`absolute bottom-0 left-0 right-0 p-3 transition-opacity opacity-0 group-hover:opacity-100 ${!playing ? 'opacity-100' : ''} bg-gradient-to-t from-black/80 to-transparent`}>

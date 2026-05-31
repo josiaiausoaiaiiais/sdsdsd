@@ -43,7 +43,7 @@ export default function PublicViewer({ embed = false }) {
   };
 
   const {
-    ref, playing, progress, duration, muted, heatmap,
+    ref, playing, progress, duration, muted, ended, heatmap,
     onLoadedMetadata, onTimeUpdate, toggle, seek, reset, toggleMute, requestFullscreen, containerRef,
   } = useVideoPlayer({ videoId: id });
 
@@ -96,6 +96,10 @@ export default function PublicViewer({ embed = false }) {
       setLeadFields(f => ({ ...f, error: "Please enter a valid email." }));
     }
   };
+  // End-screen conversion CTA: prefer a form (lead capture), else the latest CTA by timestamp.
+  const sortedCtas = (data.ctas || []).slice().sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0));
+  const endCta = sortedCtas.find(c => c.type === "form") || sortedCtas[0] || null;
+  const endCtaDone = endCta ? submittedCtas.has(endCta.id) : false;
 
   const player = (
     <div ref={containerRef} style={{ "--brand": brandColor }}
@@ -121,12 +125,40 @@ export default function PublicViewer({ embed = false }) {
           )}
         </div>
       )}
-      {!playing && (
+      {!playing && !ended && (
         <button onClick={toggle} aria-label="Play" data-testid="public-play"
           className="absolute inset-0 m-auto w-20 h-20 rounded-full nb-border text-white flex items-center justify-center shadow-[6px_6px_0_0_rgba(0,0,0,0.6)] transition-transform hover:scale-110"
           style={{ background: brandColor }}>
           <Play size={32} fill="white"/>
         </button>
+      )}
+      {ended && (
+        <div className="absolute inset-0 bg-ink/90 backdrop-blur-sm flex flex-col items-center justify-center text-center p-6" data-testid="public-end-screen">
+          <div className="flex items-center gap-2 mb-4 bg-white/95 nb-border rounded-full px-4 py-2 font-heading font-black">
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: brandColor }}/> {logoText}
+          </div>
+          {endCta && !endCtaDone ? (
+            <div className="bg-white nb-border nb-shadow-lg rounded-2xl p-5 max-w-md w-full" data-testid="public-end-cta">
+              <div className="font-heading text-xl mb-3 text-ink">{endCta.text || "Want to learn more?"}</div>
+              {endCta.type === "form" ? (
+                <div className="space-y-2">
+                  {(endCta.form_fields || ["email"]).map(f => (
+                    <input key={f} className="nb-input text-sm" placeholder={f}
+                      value={leadFields[f] || ""} onChange={e => setLeadFields(prev => ({ ...prev, [f]: e.target.value, error: "" }))}
+                      data-testid={`public-end-field-${f}`}/>
+                  ))}
+                  {leadFields.error && <p className="text-coral text-xs" data-testid="public-end-error">{leadFields.error}</p>}
+                  <button onClick={() => submitLead(endCta)} className="nb-btn w-full text-sm" style={{ background: brandColor }} data-testid="public-end-submit">Submit</button>
+                </div>
+              ) : (
+                <a href={endCta.url || "#"} target="_blank" rel="noreferrer" className="nb-btn w-full justify-center text-sm" style={{ background: brandColor }} data-testid="public-end-link">{endCta.button_label || "Learn more"}</a>
+              )}
+            </div>
+          ) : (
+            <div className="text-white font-heading text-xl mb-4">{endCtaDone ? "Thanks — we'll be in touch!" : "Thanks for watching!"}</div>
+          )}
+          <button onClick={reset} className="mt-5 nb-btn nb-btn-ghost bg-white text-sm" data-testid="public-end-replay"><RotateCcw size={16}/> Watch again</button>
+        </div>
       )}
       <div className={`absolute bottom-0 left-0 right-0 p-3 transition-opacity opacity-0 group-hover:opacity-100 ${!playing ? 'opacity-100' : ''} bg-gradient-to-t from-black/80 to-transparent`}>
         <div className="flex items-end gap-[2px] h-5 mb-1 px-1">

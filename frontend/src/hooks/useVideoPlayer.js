@@ -13,6 +13,7 @@ export function useVideoPlayer({ videoId, autoHeatmap = true }) {
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
+  const [ended, setEnded] = useState(false);
   const [heatmap, setHeatmap] = useState([]);
 
   const tracked = useRef(false);
@@ -79,7 +80,11 @@ export function useVideoPlayer({ videoId, autoHeatmap = true }) {
   }, []);
 
   const reset = useCallback(() => {
-    if (ref.current) ref.current.currentTime = 0;
+    if (ref.current) {
+      ref.current.currentTime = 0;
+      setEnded(false);
+      ref.current.play?.();
+    }
   }, []);
 
   const toggleMute = useCallback(() => {
@@ -100,9 +105,9 @@ export function useVideoPlayer({ videoId, autoHeatmap = true }) {
 
   useEffect(() => {
     const v = ref.current; if (!v) return;
-    const p = () => setPlaying(true);
+    const p = () => { setPlaying(true); setEnded(false); };
     const pz = () => setPlaying(false);
-    const ended = () => reloadHeatmap();
+    const ended = () => { setEnded(true); reloadHeatmap(); };
     v.addEventListener("play", p);
     v.addEventListener("pause", pz);
     v.addEventListener("ended", ended);
@@ -114,7 +119,7 @@ export function useVideoPlayer({ videoId, autoHeatmap = true }) {
   }, [reloadHeatmap]);
 
   return {
-    ref, containerRef, playing, progress, duration, muted, heatmap,
+    ref, containerRef, playing, progress, duration, muted, ended, heatmap,
     onLoadedMetadata, onTimeUpdate,
     toggle, seek, reset, toggleMute, requestFullscreen,
   };
