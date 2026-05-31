@@ -7,7 +7,7 @@ import { useVideoPlayer, fmtTime } from "@/hooks/useVideoPlayer";
  */
 export default function VideoPlayer({ src, videoId, brandColor = "#FF6B6B", logoText = "Looma", logoPosition = "top-right", thumbnail = "", ctas = [] }) {
   const {
-    ref, playing, progress, duration, muted, heatmap,
+    ref, containerRef, playing, progress, duration, muted, heatmap,
     onLoadedMetadata, onTimeUpdate, toggle, seek, reset, toggleMute, requestFullscreen,
   } = useVideoPlayer({ videoId });
 
@@ -19,7 +19,8 @@ export default function VideoPlayer({ src, videoId, brandColor = "#FF6B6B", logo
   const pos = { "top-left": "top-4 left-4", "top-right": "top-4 right-4", "bottom-left": "bottom-4 left-4", "bottom-right": "bottom-4 right-4" }[logoPosition] || "top-4 right-4";
 
   return (
-    <div className="relative w-full aspect-video bg-ink rounded-2xl nb-border nb-shadow-lg overflow-hidden group" data-testid="video-player">
+    <div ref={containerRef} style={{ "--brand": brandColor }}
+      className="player-shell relative w-full aspect-video bg-ink rounded-2xl nb-border nb-shadow-lg overflow-hidden group" data-testid="video-player">
       <video ref={ref} src={src} poster={thumbnail || undefined}
         className="w-full h-full object-contain bg-black"
         onLoadedMetadata={onLoadedMetadata} onTimeUpdate={onTimeUpdate}
@@ -64,14 +65,14 @@ export default function VideoPlayer({ src, videoId, brandColor = "#FF6B6B", logo
         </div>
         <div className="flex items-center justify-between text-white text-sm font-bold">
           <div className="flex items-center gap-2">
-            <button onClick={toggle} className="p-2 rounded-full hover:bg-white/15" data-testid="player-toggle">
+            <button onClick={toggle} className="player-ctrl p-2 rounded-full nb-border" data-testid="player-toggle">
               {playing ? <Pause size={18}/> : <Play size={18} fill="white"/>}
             </button>
-            <button onClick={reset} className="p-2 rounded-full hover:bg-white/15"><RotateCcw size={16}/></button>
-            <button onClick={toggleMute} className="p-2 rounded-full hover:bg-white/15">{muted ? <VolumeX size={16}/> : <Volume2 size={16}/>}</button>
-            <span className="ml-2">{fmtTime((progress/100) * duration)} / {fmtTime(duration)}</span>
+            <button onClick={reset} className="player-ctrl p-2 rounded-full nb-border"><RotateCcw size={16}/></button>
+            <button onClick={toggleMute} className="player-ctrl p-2 rounded-full nb-border">{muted ? <VolumeX size={16}/> : <Volume2 size={16}/>}</button>
+            <span className="ml-2 font-heading tracking-tight">{fmtTime((progress/100) * duration)} / {fmtTime(duration)}</span>
           </div>
-          <button onClick={requestFullscreen} className="p-2 rounded-full hover:bg-white/15"><Maximize size={16}/></button>
+          <button onClick={requestFullscreen} className="player-ctrl p-2 rounded-full nb-border" data-testid="player-fullscreen"><Maximize size={16}/></button>
         </div>
       </div>
     </div>

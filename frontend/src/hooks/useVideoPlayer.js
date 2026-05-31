@@ -8,6 +8,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export function useVideoPlayer({ videoId, autoHeatmap = true }) {
   const ref = useRef(null);
+  const containerRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -89,7 +90,12 @@ export function useVideoPlayer({ videoId, autoHeatmap = true }) {
   }, []);
 
   const requestFullscreen = useCallback(() => {
-    ref.current?.requestFullscreen?.();
+    // Fullscreen the container (not the bare <video>) so the custom branded
+    // controls, heatmap and CTA overlays stay visible in fullscreen mode.
+    const el = containerRef.current || ref.current;
+    if (!el) return;
+    if (document.fullscreenElement) document.exitFullscreen?.();
+    else (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
   }, []);
 
   useEffect(() => {
@@ -108,7 +114,7 @@ export function useVideoPlayer({ videoId, autoHeatmap = true }) {
   }, [reloadHeatmap]);
 
   return {
-    ref, playing, progress, duration, muted, heatmap,
+    ref, containerRef, playing, progress, duration, muted, heatmap,
     onLoadedMetadata, onTimeUpdate,
     toggle, seek, reset, toggleMute, requestFullscreen,
   };

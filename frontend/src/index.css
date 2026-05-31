@@ -137,3 +137,32 @@ h1, h2, h3, h4, h5, h6 {
 
 .scrollbar-thin::-webkit-scrollbar { width: 8px; height: 8px; }
 .scrollbar-thin::-webkit-scrollbar-thumb { background: hsl(var(--fg)); border-radius: 9999px; }
+
+/* ---- Branded video player controls (match site buttons/colors) ---- */
+.player-ctrl {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.55);
+  color: #fff;
+  transition: background-color .15s ease, color .15s ease, transform .12s ease;
+}
+.player-ctrl:hover {
+  background: var(--brand, #FF6B6B);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+/* Fullscreen: let the custom branded UI fill the screen instead of native controls */
+.player-shell:fullscreen,
+.player-shell:-webkit-full-screen {
+  width: 100vw !important;
+  height: 100vh !important;
+  aspect-ratio: auto !important;
+  border-radius: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.player-shell:fullscreen video,
+.player-shell:-webkit-full-screen video {
+  width: 100%;
+  height: 100%;
+}

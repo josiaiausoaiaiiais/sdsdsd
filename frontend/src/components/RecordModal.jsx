@@ -212,9 +212,9 @@ export default function RecordModal({ onClose }) {
       <div className="bg-cream nb-border rounded-3xl nb-shadow-lg max-w-3xl w-full p-7 max-h-[92vh] overflow-y-auto scrollbar-thin" onClick={e=>e.stopPropagation()} data-testid="record-modal">
         <div className="flex justify-between items-start mb-5">
           <div>
-            <div className="font-hand text-2xl text-coral">record a test one now</div>
+            <div className="font-hand text-2xl text-coral">upload a file or record a new one</div>
             <h2 className="font-heading text-3xl">
-              {{ setup: "Start a new recording", recording: "Recording in progress",
+              {{ setup: "Upload or record a video", recording: "Recording in progress",
                  preview: "Preview your video", uploading: "Uploading to Looma" }[step]}
             </h2>
           </div>

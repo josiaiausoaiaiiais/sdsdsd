@@ -44,7 +44,7 @@ export default function PublicViewer({ embed = false }) {
 
   const {
     ref, playing, progress, duration, muted, heatmap,
-    onLoadedMetadata, onTimeUpdate, toggle, seek, reset, toggleMute, requestFullscreen,
+    onLoadedMetadata, onTimeUpdate, toggle, seek, reset, toggleMute, requestFullscreen, containerRef,
   } = useVideoPlayer({ videoId: id });
 
   if (err) return (
@@ -98,7 +98,8 @@ export default function PublicViewer({ embed = false }) {
   };
 
   const player = (
-    <div className="relative w-full aspect-video bg-ink rounded-2xl nb-border nb-shadow-lg overflow-hidden group" data-testid="public-player">
+    <div ref={containerRef} style={{ "--brand": brandColor }}
+      className="player-shell relative w-full aspect-video bg-ink rounded-2xl nb-border nb-shadow-lg overflow-hidden group" data-testid="public-player">
       <video ref={ref} src={src} poster={data.thumbnail || undefined}
         className="w-full h-full object-contain bg-black"
         onLoadedMetadata={onLoadedMetadata} onTimeUpdate={onTimeUpdate}
@@ -140,12 +141,12 @@ export default function PublicViewer({ embed = false }) {
         </div>
         <div className="flex items-center justify-between text-white text-sm font-bold">
           <div className="flex items-center gap-2">
-            <button onClick={toggle} className="p-2 rounded-full hover:bg-white/15">{playing ? <Pause size={18}/> : <Play size={18} fill="white"/>}</button>
-            <button onClick={reset} className="p-2 rounded-full hover:bg-white/15"><RotateCcw size={16}/></button>
-            <button onClick={toggleMute} className="p-2 rounded-full hover:bg-white/15">{muted ? <VolumeX size={16}/> : <Volume2 size={16}/>}</button>
-            <span className="ml-2">{fmtTime((progress/100)*duration)} / {fmtTime(duration)}</span>
+            <button onClick={toggle} className="player-ctrl p-2 rounded-full nb-border">{playing ? <Pause size={18}/> : <Play size={18} fill="white"/>}</button>
+            <button onClick={reset} className="player-ctrl p-2 rounded-full nb-border"><RotateCcw size={16}/></button>
+            <button onClick={toggleMute} className="player-ctrl p-2 rounded-full nb-border">{muted ? <VolumeX size={16}/> : <Volume2 size={16}/>}</button>
+            <span className="ml-2 font-heading tracking-tight">{fmtTime((progress/100)*duration)} / {fmtTime(duration)}</span>
           </div>
-          <button onClick={requestFullscreen} className="p-2 rounded-full hover:bg-white/15"><Maximize size={16}/></button>
+          <button onClick={requestFullscreen} className="player-ctrl p-2 rounded-full nb-border"><Maximize size={16}/></button>
         </div>
       </div>
     </div>
